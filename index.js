@@ -1,22 +1,27 @@
 import express, { json } from "express";
 import dotenv from "dotenv";
-import { Pool } from "pg";
 import cors from "cors";
+import knex from "knex";
+import config from "./knexfile.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
-});
 
 app.use(cors());
 app.use(json());
+
+const db = knex(config.development);
+
+db.raw("SELECT NOW()")
+  .then(() => {
+    console.log("Connected to PostgreSQL!");
+    db.destroy();
+  })
+  .catch((err) => {
+    console.error("Connection error:", err);
+  });
 
 app.get("/", (req, res) => {
   res.send("Backend is running");
