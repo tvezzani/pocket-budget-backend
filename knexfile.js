@@ -15,6 +15,13 @@ export default {
       password: process.env.DATABASE_PASSWORD || "",
       database: process.env.DATABASE_NAME || "postgres",
     },
+    migrations: {
+      directory: "./migrations",
+      extension: "mjs",
+    },
+    seeds: {
+      directory: "./seeds",
+    },
   },
   staging: {
     client: "pg",

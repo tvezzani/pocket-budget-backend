@@ -6,6 +6,11 @@ const db = knex(config.development);
 async function setupDatabase() {
   try {
     await db.schema.dropTableIfExists("users");
+    await db.schema.dropTableIfExists("budgets");
+    await db.schema.dropTableIfExists("categories");
+    await db.schema.dropTableIfExists("months");
+    await db.schema.dropTableIfExists("category_amount_by_duration");
+    await db.schema.dropTableIfExists("transactions");
 
     await db.schema.createTable("users", (table) => {
       table.increments("id").primary();
@@ -30,15 +35,50 @@ async function setupDatabase() {
       table.integer("created_by_user_id").unsigned().nullable();
       table.integer("updated_by_user_id").unsigned().nullable();
 
-      // Set up foreign key relationships
+      table.foreign("primary_owner").references("id").inTable("users");
       table.foreign("created_by_user_id").references("id").inTable("users");
       table.foreign("updated_by_user_id").references("id").inTable("users");
 
-      //Adds created_at and updated_at columns
       table.timestamps(true, true);
     });
 
-    console.info("Database schema initialized successfully!");
+    await db.schema.createTable("categories", (table) => {
+      table.increments("id").primary();
+      table.string("name").notNullable();
+      table.integer("budget_id").unsigned().notNullable();
+      table.integer("created_by_user_id").unsigned().nullable();
+      table.integer("updated_by_user_id").unsigned().nullable();
+
+      table.foreign("budget_id").references("id").inTable("budgets");
+      table.foreign("created_by_user_id").references("id").inTable("users");
+      table.foreign("updated_by_user_id").references("id").inTable("users");
+
+      table.timestamps(true, true);
+    });
+
+    await db.schema.createTable("category_amount_by_duration", (table) => {
+      table.increments("id").primary();
+      table.integer("budget_id").unsigned().notNullable();
+      table.integer("category_id").unsigned().notNullable();
+      table.float("amount").notNullable();
+      // This duration solution could be improved to closer to best practices
+      table.timestamp("duration_start").notNullable();
+      table.timestamp("duration_end").notNullable();
+
+      table.integer("created_by_user_id").unsigned().nullable();
+      table.integer("updated_by_user_id").unsigned().nullable();
+
+      table.foreign("budget_id").references("id").inTable("budgets");
+      table.foreign("category_id").references("id").inTable("budgets");
+      table.foreign("created_by_user_id").references("id").inTable("users");
+      table.foreign("updated_by_user_id").references("id").inTable("users");
+
+      table.timestamps(true, true);
+    });
+
+    //TODO: transactions
+
+    console.info("✅ Database schema initialized successfully!");
 
     await db("users").insert([
       {
@@ -64,9 +104,9 @@ async function setupDatabase() {
       },
     ]);
 
-    console.info("Demo data inserted successfully!");
+    console.info("✅ Demo data inserted successfully!");
   } catch (error) {
-    console.error("Error initializing database:", error);
+    console.error("❌ Error initializing database:", error);
   } finally {
     db.destroy();
   }
