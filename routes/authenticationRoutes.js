@@ -77,6 +77,7 @@ router.get("/authorization-code/callback", async (req, res) => {
   // This may not be needed
   //   oauth2Client.setCredentials(tokens);
 
+  // TODO: introduce db transactions for case when exception happens after user is created
   if (!userId || !tokens.access_token) {
     console.warn(
       "A user tried to sign in and authentication failed. User session not created."
@@ -90,6 +91,7 @@ router.get("/authorization-code/callback", async (req, res) => {
   });
 
   // TODO: define the age of the token in one place, rather than here
+  // TODO: introduce how cookie can be used to avoid making the end user signin over and over again
   res.cookie("pocket_budget_user_session", userSessionToken, {
     httpOnly: false,
     maxAge: 60 * 60 * 1000,
