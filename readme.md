@@ -15,3 +15,5 @@ This is the backend application intended to act as a REST API for the pocket bud
    - DEVELOPMENT_EMAIL = (will predicate all seeded emails)
 3. Run the script `migrate` and then `seed`, which will create tables in your database, and then seed data in them.
 4. Start with script `start` or `dev`
+
+TODO: Add documentation for obtaining google oauth credentials

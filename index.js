@@ -3,6 +3,10 @@ import dotenv from "dotenv";
 import cors from "cors";
 import knex from "knex";
 import config from "./knexfile.js";
+import userRoutes from "./routes/userRoutes.js";
+import fs from "fs";
+import { google } from "googleapis";
+import { jwtDecode } from "jwt-decode";
 
 dotenv.config();
 
@@ -13,6 +17,16 @@ app.use(cors());
 app.use(json());
 
 const db = knex(config.development);
+
+const {
+  web: { client_id, client_secret, redirect_uris },
+} = JSON.parse(fs.readFileSync("./googleClientSecret.json").toString());
+
+const oauth2Client = new google.auth.OAuth2(
+  client_id,
+  client_secret,
+  redirect_uris[0]
+);
 
 db.raw("SELECT NOW()")
   .then(() => {
@@ -26,56 +40,64 @@ app.get("/health", (req, res) => {
   res.send("Backend is healthy!");
 });
 
-app.get("/users", async (req, res) => {
-  try {
-    const rows = await db("users").select("*");
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+app.get("/login-google-url", (req, res) => {
+  const scopes = ["https://www.googleapis.com/auth/userinfo.email", "openid"];
+
+  const url = oauth2Client.generateAuthUrl({
+    // 'online' (default) or 'offline' (gets refresh_token)
+    access_type: "offline",
+
+    // If you only need one scope, you can pass it as a string
+    scope: scopes,
+  });
+
+  res.json({ url });
 });
 
-app.post("/user", async (req, res) => {
+async function verifyToken(token) {
   try {
-    const { username, email, password } = req.body;
-    const [newUser] = await db("users")
-      .insert({ username, email, password })
-      .returning("*");
-    res.status(201).json(newUser);
+    // Verify and decode the JWT token
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken: token,
+      audience: client_id,
+    });
+
+    // Extract payload (user data) from the token
+    const payload = ticket.getPayload();
+
+    console.log("Decoded Payload:", payload);
+    return payload;
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error verifying JWT:", error);
+    return null;
   }
+}
+
+app.get("/authorization-code/callback", async (req, res) => {
+  const { code } = req.query;
+  const { tokens } = await oauth2Client.getToken(code);
+
+  // Verify and parse tokens
+
+  // const payload = verifyToken(tokens.id_token);
+  const payload = jwtDecode(tokens.id_token);
+
+  // Create a record if it doesn't exist, or link an account or something
+
+  oauth2Client.setCredentials(tokens);
+
+  // Possibly pass values
+
+  res.cookie("jwt", JSON.stringify(tokens), {
+    httpOnly: false,
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+
+  return res.redirect("http://localhost:3000");
+  res.json(payload);
 });
 
-app.put("/user/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { username, email, password } = req.body;
-    const [updatedUser] = await db("users")
-      .where({ id })
-      .update({ username, email, password })
-      .returning("*");
-    if (!updatedUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    res.json(updatedUser);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete("/user/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [deletedUser] = await db("users").where({ id }).del().returning("*");
-    if (!deletedUser) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    res.status(200).json("User successfully deleted");
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+userRoutes(app, db);
 
 app.get("/budgets", async (req, res) => {
   try {
